@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Tables</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Tables</h1>
+
+<p>Here is a summary of design decisions for the table class:</p>
+
+<p class="indent"><a href="Table.java">Table.java</a><br/>
+<a href="Record.java">Record.java</a><br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>Column names:</b> store them in a record. I'm using the word 'columns' to
+mean column names from now on. I don't think storing the columns as the first
+row is a very good option. I may have to change my mind and use a separate class
+for the columns later, e.g. if column types are introduced.</p>
+
+<pre>private Record columns;
+</pre>
+
+<p><b>Records:</b> use a list. Adding and deleting records are common
+operations, so a list is better this time. I am declaring the
+<code>records</code> variable as <code>List&lt;Record></code>, not
+<code>ArrayList&lt;Record></code>, so that there is only one place where my
+choice of <code>ArrayList</code> as the list implementation would have to be
+changed.</p>
+
+<pre>private List&lt;Record> records;
+</pre>
+
+<p><b>Robustness of column names:</b> Column names are not just strings. They
+must all be different. And an empty string doesn't make sense as a column name.
+I've decided to make the column name comparisons case-insensitive, though the
+opposite decision is also OK.</p>
+
+<pre>if (names[i] == null) throw new Error("Bad col");
+if (names[i].length() == 0) throw new Error("Bad col");
+for (int j=0; j&lt;i; j++) {
+    if (names[i].equalsIgnoreCase(names[j])) {
+        throw new Error("Repeated column name");
+    }
+}
+</pre>
+
+<p><b>Methods:</b> are mostly straightforward. But note the way I have tried to
+think of everything that could possibly happen that should be prevented. Also
+note the warnings in the comments.</p>
+
+<p><b>Slow search:</b> the method that translates a column name into a column
+index uses a slow linear search. I am assuming that, for bulk operations on
+records, you would first convert the column name to an index, then use the index
+repeatedly to access the records. It would be nicer to have constant time
+conversion. But it isn't completely clear that a hash table would be faster for
+the typical number of columns in a table. If I used a hash table, I would have
+to convert names to lower case to use them as keys in the table. (Or I could use
+a <code>TreeMap</code> with <code>new
+TreeMap&lt;>(String.CASE_INSENSITIVE_ORDER)</code> but that would be
+slower.)</p>
+
+<p><b>Iteration:</b> it is possible to iterate through the records using
+<code>select(i)</code> in a loop. It could be convenient to have a method which
+returns the list of records to the caller, but I musn't do that because of the
+lack of robustness. It would look very pretty to be able to write <code>for
+(Record r : table) ....</code>. How difficult is that? Not very, because I can
+return the list's iterator:</p>
+
+<pre>class Table implements Iterable&lt;Record> {
+    ....
+    Iterator&lt;Record> iterator() { return records.iterator(); }
+}
+</pre>
+
+<p>I need a warning in the comment that the iterator is 'live'.</p>
+
+<p><b>Altering tables:</b> To illustrate, for adding a column, I have written a
+method:</p>
+
+<pre>void addColumn(int c, String name) {
+    if (name == null || name.length() == 0) throw new Error("No name");
+    columns = columns.addField(c);
+    columns.set(c, name);
+    for (int i = 0; i &lt; records.size(); i++) {
+        Record r = records.get(i);
+        r = r.addField(c);
+        records.set(i, r);
+    }
+}
+</pre>
+
+<p>I am replacing each record with a new one, and I am not using a for each
+loop, because I am changing the records list as I am iterating through it, and I
+don't want a <code>ConcurrentModificationException</code>.</p>
+
+<p>This delegates a lot of the work to the record class. A new
+<code>addField</code> method in the record class adds a new blank cell at the
+given position, returning a new record, and looks like this:</p>
+
+<pre>Record addField(int c) {
+    String[] cells = new String[fields.length + 1];
+    for (int i = 0; i &lt; cells.length; i++) {
+        if (i &lt; c) cells[i] = fields[i];
+        else if (i == c) cells[i] = "";
+        else cells[i] = fields[i-1];
+    }
+    return new Record(cells);
+}
+</pre>
+
+<p>I have left out deleting a column. And I have only tested
+<code>addField</code>. I am delaying testing of <code>addColumn<code> until keys
+are introduced.</p>
+
+<p>An important thing to notice is where the code goes. Anything to do with a
+single row is put in the Record class, so the class gains more functionality,
+and makes more guarantees. A common 'mistake' that I didn't always mention in
+people's individual feedback is to pile all new functionality into new classes
+as you go along. In general, data should be handled by the object that holds the
+data.</p>
+
+</body>
+</html>

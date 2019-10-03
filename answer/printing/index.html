@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Printing</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Printing</h1>
+
+<p>Here is a summary of design decisions for printing:</p>
+
+<p class="indent"><a href="Table.java">Table.java</a><br/>
+<a href="Record.java">Record.java</a><br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>Approach:</b> perhaps the main problem with printing is sorting out column
+widths. The width of a column should be based on the maximum length of any of
+the strings in it. That means two loops, one to find all the maximum string
+lengths, then one to do the printing.</p>
+
+<p><b>Length storage:</b> I've decided to store the maximum lengths of the
+strings in each column in an integer array <code>lengths</code>.</p>
+
+<p><b>First loop:</b> In the record class, I am going to add a method
+<code>checkLengths</code>. The method takes the <code>lengths</code> array and
+increases any number in it if the length of its corresponding field string is
+larger than the integer in the array. After the array has been passed to the
+<code>checkLengths</code> method in each record, it will hold the maximums.</p>
+
+<pre>// Increase the given column string lengths as necessary to hold the fields.
+void checkLengths(int[] lengths) {
+    for (int c = 0; c &lt; width(); c++) {
+        if (fields[c].length() > lengths[c]) {
+            lengths[c] = fields[c].length();
+        }
+    }
+}
+</pre>
+
+<p><b>Printing a line:</b> to construct a line for printing, I am going to add
+another method to the record class:</p>
+
+<pre>// Display the record on one line, within the given maximum field lengths,
+// and with spaces and a vertical bar between columns.
+String display(int[] lengths) {
+    String[] padded = new String[fields.length];
+    for (int c = 0; c &lt; fields.length; c++) {
+        String s = fields[c];
+        int pad = lengths[c] - s.length();
+        if (c == fields.length - 1) pad = 0;
+        for (int i = 0; i &lt; pad; i++) s = s + " ";
+        padded[c] = s;
+    }
+    return String.join(" | ", padded);
+}
+</pre>
+
+<p><b>Divider:</b> in the table class, I am adding a method to create a dividing
+line to go between the column names and the rows:</p>
+
+<pre>// Create a divider between the columns and the records when printing a table.
+String divider(int[] lengths) {
+    String[] parts = new String[lengths.length];
+    for (int c = 0; c &lt; fields.length; c++) {
+        String s = "";
+        for (int i = 0; i &lt; lengths[c]; i++) s = s + "-";
+        parts[c] = s;
+    }
+    return String.join("-+-", parts);
+}
+</pre>
+
+<p><b>Printing the whole table:</b> now I am ready to print the whole table,
+by adding this print method to the table class:</p>
+
+<pre>// Display the table.
+void print(PrintStream out) {
+    int[] widths = new int[width()];
+    columns.checkLengths(widths);
+    for (Record r : records) r.checkLengths(widths);
+    out.println(columns.display(widths));
+    out.println(divider(widths));
+    for (Record r : records) out.println(r.display(widths));
+}
+</pre>
+
+<p>I've used <code>PrintStream</code> so I can pass in
+<code>System.out</code>, but if I wanted to test the method, a
+<code>Writer</code> would be better, then I could pass in <em>either</em> a
+<code>new PrintWriter(System.out)</code> <em>or</em> a <code>StringWriter</code>.</p>
+
+<p>There is a problem I haven't tackled here. If a field string contains
+multiple lines, e.g. an address, printing will be mnessed up. It is a bit tricky
+to sort this out, but it can be solved.</p>
+
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Databases</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h2>Databases</h2>
+
+<p>Here is a summary of design decisions for databases:</p>
+
+<p class="indent"><a href="Database.java">Database.java</a><br/>
+<a href="Table.java">Table.java</a> (no change)<br/>
+<a href="Record.java">Record.java</a> (no change)<br/>
+<a href="Makefile">Makefile</a></p>
+
+<p>A database is stored as a collection of table files in a particular folder. A
+Database object is created by passing the folder path to the constructor. The
+Database object then finds the files and causes them to be loaded into
+tables:</p>
+
+<pre>class Database {
+    private Map&lt;String,Table> tables;
+
+    Database(File folder) {
+        tables = new TreeMap&lt;>();
+        File[] files = folder.listFiles();
+        for (File file : files) {
+            .... new Table ....
+        }
+    }
+}
+</pre>
+
+<p><b>Table names:</b> I have decided not to store the name of a table inside
+the table object. That means, when iterating, it is more convenient to iterate
+through the table <em>names</em> rather then through the table objects
+themselves, otherwise the names would be hard to get at.</p>
+
+<p>The methods are fairly obvious, and there is no testing, because it is mostly
+I/O and will get tested well enough by being used.</p>
+
+</body>
+</html>

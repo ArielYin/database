@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>Feedback on db assignment</title>
+<style>
+    body { font-size: 120%; }
+    pre, .indent {margin-left:20px; }
+    .middle { text-align: center; }
+</style>
+<link rel="stylesheet"
+  href="https://cdn.jsdelivr.net/highlight.js/9.9.0/styles/xcode.min.css"/>
+<script
+  src="https://cdn.jsdelivr.net/highlight.js/9.9.0/highlight.min.js"></script>
+<script
+  src="https://cdn.jsdelivr.net/highlight.js/9.9.0/languages/java.min.js"></script>
+<script>
+  addEventListener('load', start);
+  function start() {
+    var pres = document.querySelectorAll("pre");
+    for (var i in pres) hljs.highlightBlock(pres[i]);
+  }
+</script>
+</head>
+<body>
+
+<h1>Feedback on DB assignment</h1>
+
+<p>You've done the main stages, plus a bit of querying.
+</p>
+
+<p>My dependency checker shows that you have a cyclic dependency between the Print
+and Table classes. That's a weakness.
+</p>
+
+<p>(Your database class has a field that isn't private. Probably just a last minute
+thing.)
+</p>
+
+<p>Overall, you have done some good design and testing. Check answer.zip for
+tips on how to improve.
+</p>
+
+<p>Also, see your automatically generated style feedback:</p>
+
+<p class="indent"><a href="uml.png">UML diagram</a><br/>
+<a href="comments.txt">style comments</a></p>
+
+<h2>General feedback</h2>
+
+<p>I gave some credit for the amount of work you did, but mostly I was looking
+for evidence of steady development and a good robust final design with
+testing.</p>
+
+<p>Here is my stage-by-stage development of the assignment, including design
+decisions and source code. Download the zip file, unzip it, and view the
+top-level index.html file in your browser:</p>
+
+<p class="indent"><a href="answer.zip">answer.zip</a></p>
+
+<p>Perhaps the most common design weakness in your projects, that I haven't
+necessarily mentioned in your individual feedback, is for your record class to
+end up too small and the other classes too big, because you haven't made the
+record class responsible for <em>all</em> one-row operations. That means you are
+getting data out of records and manipulating it elsewhere. As well as being
+unbalanced, this is less robust than it could be, because the record class
+doesn't then give guarantees about <em>all</em> one-row issues.</p>
+
+<p>I am not promising that my final program is bug-free. But I hope you will
+check it for tips on where to put code, how to make really robust components,
+how classes can evolve, how to leave user interaction until late on, what kind
+of tricks you can use, how to refactor (e.g. switching from indexes to keys) or
+whatever. And you might like to compare your total number of lines to mine, for
+similar functionality.</p>
+
+</body>
+</html>

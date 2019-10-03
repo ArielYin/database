@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Keys</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h2>Keys</h2>
+
+<p>Here is a summary of design decisions for keys:</p>
+
+<p class="indent"><a href="Table.java">Table.java</a><br/>
+<a href="Record.java">Record.java</a><br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>User defined or auto-generated:</b> user defined. This is a difficult
+decision, because both are useful and both are allowed in real databases. For
+example, for people records, user-defined usernames are probably better. For
+sales records, auto-generated keys are probably better. But having user-defined
+keys is easier for now. I'll discuss auto-generated ones later.</p>
+
+<p><b>Save keys in files:</b> yes. For user-defined keys it is essential. Later,
+when foreign key references are considered, even for auto-generated keys, it
+will be important to store keys in the table files, so that they stay the same
+after shutting the program down and starting it up again. In any case, it is
+easier now to store the keys than to forget them and regenerate them, because
+everything is in place to do that.</p>
+
+<p><b>Which field:</b> for simplicity, let's make it the first field in each
+record. I think that's better than storing the key separately, because it has to
+be written to file, and read back, and escaped and so on, just like the other
+fields. On the other hand, it must not be possible to change the key of a
+record, otherwise that could break the table it is in (by causing a duplicate
+key, or a record out of order). So the first change to my record class is:</p>
+
+<pre>void set(int col, String value) {
+    if (col == 0) throw new Error("Can't change key");
+    ....
+}
+</pre>
+
+<p>If I had a constructor to build a key with blank fields, I would need to pass
+it the key as an argument, so it can be set once on creation rather then being
+left blank.</p>
+
+<p><b>Storing records by key</b> if users manage keys, then all you have to do
+is to store the records in a <code>Map&lt;String,Record></code> instead of
+<code>List&lt;Record></code>. Using <code>TreeMap</code> as the implementation
+keeps the records in key order, which is probably what a user would expect. If
+you think the order doesn't matter, you could use a <code>HashMap</code>, or if
+you want insertion order, you can use a <code>LinkedHashMap</code>. In any case,
+you can use a key to find a record quickly and conveniently.</p>
+
+<p><b>Case insensitivity:</b> convert any string to lower case before using it
+as a key or looking it up as a key.</p>
+
+<p>The <code>select</code> and <code>delete</code> methods are changed so that
+they take a key as argument. The tests have to be changed to match.</p>
+
+<p>Every loop has to be changed from <code>for (Record r : records)</code> to
+<code>for (Record r : records.values())</code>. The <code>iterator</code> method
+becomes:</p>
+
+<pre>public Iterator&lt;Record> iterator() {
+    return records.values().iterator();
+}
+</pre>
+
+<p>Note that it would not be robust to give away <code>records.values()</code>
+because it is 'live' and could be used to damage the table. The iterator is
+'live', but in a more controlled way. The <code>insert</code> method now inserts
+or updates (I could have separated these two operations, but haven't bothered).
+The call the insert method makes on the records map is:</p>
+
+<pre>records.put(r.get(0), r);
+</pre>
+
+<p>If you want to test whether a key is already being used, you can do it with
+<code>records.containsKey(k)</code> or <code>records.get(k) != null</code>. If
+you want case-insensitivity of keys, you could use:</p>
+
+<pre>records.put(r.get(0).toLowerCase(), r);
+records.get(key.toLowerCase());
+</pre>
+
+<p><b>Auto-generated keys</b> I've decided to add auto-generated keys as an
+option, and to allow mixed auto-generated and manual keys. To auto-generate
+keys, I've added an extra counter field in each table object:</p>
+
+<pre>private int nextKey;
+</pre>
+
+<p><b>Uniqueness</b> As manual keys are allowed, providing a new key on demand
+involves checking to see if it is unique:</p>
+
+<pre>// Provide a unique auto-generated key for a new record.
+String newKey() {
+    String key = "" + nextKey++;
+    while (records.containsKey(key)) key = "" + nextKey++;
+    return key;
+}
+</pre>
+
+<p>It is up to the caller to create a record using the key that is returned.
+When records are deleted, keys are not reused straight away. When the program is
+shut down and started up again, then old deleted keys get reused. If you don't
+want that, because you want the numbers to represent the order of creation of
+the records, then on loading up each record from file, you can do this:</p>
+
+<pre>int key = Integer.parseInt(r.get(0));
+if (nextKey &lt;= key) nextKey = key + 1;
+</pre>
+
+<p>Uniqueness of auto keys is guaranteed. There may be 'holes' in the sequence,
+but that doesn't matter - they are only identifiers. (Some people use random
+keys, but you have to be very careful then, because randomness doesn't guarantee
+uniqueness.)</p>
+
+<p><b>Order</b> I'm using a <code>TreeMap</code>, which is not ideal because it
+keeps the records in alphabetical rather than numerical order, which puts
+<code>10</code> before <code>9</code>! The advantage is that it copes with a
+mixture of manual and auto-generated keys. If you don't care about ordering, you
+can store the records in a <code>HashMap&lt;String,Record></code>. If you allow
+only auto-generated keys, you can store the records in a
+<code>TreeMap&lt;Integer,Record></code> (converting key fields to and fro
+between strings and integers as necessary). To get the ordering right both for
+strings and integers, then you could write or find a comparator class which
+implements <a href="https://en.wikipedia.org/wiki/Natural_sort_order">natural
+sort order</a> and build a <code>TreeMap&lt;String,Record></code> with it.</p>
+
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Other extensions</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Other extensions</h1>
+
+<p>This is a brief discussion of the approaches I might have taken to a couple
+of other extensions besides the user interface.</p>
+
+<h2>Types</h2>
+
+<p>What does it mean for a column to have a type other than string? For an
+integer column, these are the issues I can think of:</p>
+
+<ol>
+<li>validity: values in the column must be integers (or blank?)</li>
+<li>printing: an integer column should probably be right-justified</li>
+<li>arithmetic: values can take part in sums or comparisons</li>
+<li>storage: integers can be stored more compactly in files</li>
+</ol>
+
+<p>Since I am using textual storage, and I am not interested in compactness, I
+am going to ignore (4) and continue storing integer values as strings in files.
+Since I am not implementing much in the way of calculation, and I am not much
+interested in efficiency, I am going to ignore (3) and continue to store integer
+values as strings in record objects.</p>
+
+<p>Since I would like to continue to have record objects cooperate in the
+row-related aspects of processing, (1) and (2) require that a record should know
+what types its fields have. Column info shouldn't be duplicated in every record.
+And a record shouldn't have access to its table, because that causes a cyclic
+dependency. So, I am going to define a new class <code>Header</code>, to hold
+the names and types of columns. A header object can be shared by a table and its
+records:</p>
+
+<pre>class Header { .... }
+
+class Record {
+    private Header header;
+    Record(Header h, String... fields) { .... }
+    ....
+}
+
+class Table {
+    private Header header;
+    ....
+}
+</pre>
+
+<p>The header object would be owned by the table and passed to each record when
+it is constructed. If the table changes the header (e.g. renames a column) then
+all the records see the change. The header object can contain an enumeration for
+the types, the name and type of each column, and a <code>valid(i, s)</code>
+method that checks whether a string <code>s</code> is valid for the type of
+column <code>i</code>. Integer validity means a possible minus sign followed by
+digits, excluding e.g. <code>"042"</code> and <code>"-0"</code> to ensure
+uniqueness.</p>
+
+<p>Now adding validity to the record class amounts to checking validity in the
+<code>set</code> method. And right-justifying an integer column for printing is
+an adjustment to the <code>display</code> method.</p>
+
+<h2>Constraints</h2>
+
+<p>This means adding foreign key fields, i.e. fields which refer to a record in
+another table by key, and checking their consistency. That means (a) when you
+insert or update a record with a reference, there must be a record in the target
+table with that key and (b) when you delete a record or update its key in the
+target table, there must not be any records which refer to the old key.</p>
+
+<p>In real database libraries, constraint checking can be extremely valuable, as
+it guarantees consistency of the data, even if there are bugs in your program.
+In some real databases, such as <code>sqlite</code>, the feature has to be
+explicitly switched on. The idea is that you switch it on while you are
+developing your program, then switch it off in production. I personally keep it
+switched on all the time. Otherwise, as some people say, it is like wearing a
+life jacket on land, and then taking it off when you go to sea.</p>
+
+<p>Implementing constraint checking is a challenge, because it involves multiple
+tables just at the moment when you are changing one field in one record. Can the
+update of a field be kept local within the record class? The answer is yes, if
+we extend how the header class works. The trick is that keys in a table are
+handled using a <code>Map</code>, and one of the methods on a map is
+<code>keySet()</code> which returns the set of keys. And that set is live, i.e.
+as keys change in the map, the changes are visible through the set. So the
+header class could look something like this:</p>
+
+<pre>class Header {
+    private static enum Type { Text, Int, Ref };
+    private static class Column { String name; Type type; Set&lt;String> keys; };
+    private Column[] columns;
+
+    boolean valid(int i, String s) {
+        switch (columns[i].type) {
+            case Text: return true;
+            case Int: ....;
+            case Ref: return columns[i].keys.contains(s);
+        }
+    }
+}
+</pre>
+
+<p>When the header object is created, a reference column has the set of keys
+passed in for the target table. This solves half the problem, which is making
+sure that when a reference is created or changed, it refers to a valid key.</p>
+
+<p>The other half of the problem is dealing with a change to a key. For that, I
+would add a field to the table class. It would be a multi-set of references to
+the table's keys:</p>
+
+<pre>class Table {
+    private Map&lt;String, Integer> refs = new HashMap&lt;>();
+    ....
+}
+</pre>
+
+<p>Each entry in the multi-set counts how many times a key appears in references
+in other tables. This multi-set can be stored in the header of each referencing
+table. Every time a reference field is added, deleted or updated, the multi-set
+is updated accordingly. When a key field is deleted or updated, a check is made
+to make sure the entry in the multi-set is zero, i.e. there are no
+references.</p>
+
+<p>Checking constraints has costs. There is a memory cost for the extra
+multi-sets (but databases need 'indexes' for all sorts of purposes anyway). The
+efficiency cost is only a constant time extra per operation on a key or
+reference field. (The costs could be reduced a bit if keys are auto-generated
+compact integers, and 'user defined keys' are treated as secondary keys.)</p>
+
+</body>
+</html>

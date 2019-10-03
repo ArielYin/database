@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Files</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Files</h1>
+
+<p>Here is a summary of design decisions for file handling:</p>
+
+<p class="indent"><a href="Table.java">Table.java</a><br/>
+<a href="Record.java">Record.java</a><br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>Storage format:</b> plain text, one line per record, a comma and space
+between fields. Using a library class from the Web which supports CSV format is
+OK. Using serialization seems good to start with, but has a problem. If you
+serialize an object then upgrade its class, you may not be able to deserialize.
+Adding a <code>SerialVersionUID</code> helps, but doesn't solve the problem. You
+should only use serialization if <b>either</b> you are sure the relevant classes
+are never going to change (which is never, in agile development), <b>or</b> the
+files created are temporary and can always be discarded. So I personally would
+never use it for a production system. It is easy enough to sort out storage
+yourself, using some tricks to keep things short and simple.</p>
+
+<p><b>Escape character:</b> To cope with a field string which contains a newline
+or comma, I need a custom escape mechanism. I could use <code>\</code> as an
+escape character, but that's confusing. It is already used in Java strings, so,
+to get the two characters <code>\n</code> into a string instead of a single
+newline, I would have to use <code>\\n</code>. So instead, I am going to use the
+<code>%</code> character.</p>
+
+<p><b>Escape sequences:</b> I am going to use <code>%n</code> for newline,
+<code>%c</code> for comma and <code>%p</code> for percent. Note that using
+<code>%,</code> (percent and comma) for a comma is not a very good choice,
+because then there are two types of comma in a line so that a simple
+<code>split(", ")</code> call doesn't work. And using <code>%%</code> for a
+percent isn't a good choice for a similar reason.</p>
+
+<p><b>Record class:</b> needs an added constructor for loading, and a save
+method:</p>
+
+<pre>// Load a record from a line of text, unescaping the escaped characters.
+Record(String line) {
+    fields = line.split(", ");
+    for (int i = 0; i &lt; fields.length; i++) {
+        String s = fields[i];
+        s = s.replaceAll("%n", "\n");
+        s = s.replaceAll("%c", ",");
+        s = s.replaceAll("%p", "%");
+        fields[i] = s;
+    }
+}
+</pre>
+
+<pre>// Save a record to a line of text, escaping the problem characters.
+String save() {
+    String[] fs = new String[fields.length];
+    for (int i = 0; i &lt; fs.length; i++) {
+        String s = fields[i];
+        s = s.replaceAll("%", "%p");
+        s = s.replaceAll(",", "%c");
+        s = s.replaceAll("\n", "%n");
+        fs[i] = s;
+    }
+    return String.join(", ", fs);
+}
+</pre>
+
+<p>The <code>%p</code> replacement needs to be first in save, and last in the
+constructor. Then the escape mechanism is absolute, i.e. there are no
+circumstances where any particular characters in a field can cause any problems.
+It is easy to add testing for loading and saving. I think the simplicity of this
+DIY approach shows that the CSV format is quite a lot more complex than it needs
+to be (presumably for 'readability'). And the usual type of backslash escape
+convention in strings is also over-complex. (By the way, I haven't called the
+method <code>toString</code> rather than <code>save</code> because when I get to
+printing there are going to be two different ways of making a string out of a
+record.)</p>
+
+<p><b>Where to put load/save:</b> in the table class. In my opinion, it is OK to
+have code in the table class to read and write files. That's because the files
+'belong' to the table class, and have nothing to do with user interaction, and
+it doesn't prevent auto testing of the rest of the table class. But it is not
+the responsibility of a table to know where its file is (well, possibly its
+name, but not its folder), so I am going to pass in a <code>Scanner</code> for
+reading and a <code>PrintWriter</code> for writing.  I'm adding a load
+constructor and a save method:</p>
+
+<pre>// Load a table from a file.
+Table(Scanner scanner) {
+    header = new Record(scanner.nextLine());
+    while (scanner.hasNextLine()) insert(new Record(scanner.nextLine()));
+}
+</pre>
+
+<pre>// Store the table into its text file.
+void save(PrintWriter out) {
+    out.println(header.save());
+    for (Record r : records) out.println(r.save());
+}
+</pre>
+
+<p><b>Alternatives:</b> It would be OK to pass in the path of the file, or a
+File object, but it would be nicer to make the table more independent of I/O if
+possible, and therefore more testable. The constructor could take a single
+string representing the entire table content, and the save method could generate
+a single string, but for a large table the strings would be too big. Perhaps the
+best possibility, not explored here, would be to use streams of lines (using the
+new streams <code>java.util.stream</code> added in Java 8, which are somewhat
+like iterators but more flexible).</p>
+
+<p><b>Validation:</b> no. I have not bothered with explicit validation of the
+data from a saved file. But the files are (almost) guaranteed to be created by
+this program, and therefore (almost certainly) correctly formatted, so this
+should not be a big issue.</p>
+
+<p>Again, the new functionality is spread across the classes. Anything involving
+one row is handled by a record object, and anything involving multiple rows is
+handled by a table object. If either class becomes unduly bloated, I would
+consider a separate class for file I/O, but the code is quite compact, so all
+seems well. (As a very rough rule of thumb, if a class either gets too complex,
+or reaches about 500 lines, I start to think about redesigning.)</p>
+
+</body>
+</html>

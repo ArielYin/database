@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>Records</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Records</h1>
+
+<p>Here is a summary of my design decisions for the record class:</p>
+
+<p class="indent"><a href="Record.java">Record.java</a><br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>User interaction:</b> no. It is better to trust the unit testing. If you
+<b>must</b> have a user interface for experimenting, make an extra throw-away
+class like in the Stag chapter of the notes.</p>
+
+<p><b>Comments:</b> yes, especially at the top to summarize design decisions. It
+amazes me that people don't do this. Programs are extremely unreadable if you
+don't. And you are probably in for a big shock in industry, where <em>my</em>
+amount of commenting would often be regarded as totally inadequate.</p>
+
+<p><b>Name of class:</b> <code>Record</code>. Also ok would be <code>Row</code>,
+<code>Tuple</code> or even <code>Object</code> (which doesn't directly clash
+with the library class, because it is in a different package). Plurals
+(<code>Records</code>, <code>Rows</code>, ....) are not good because they go
+against a strong convention in Java. For example, the string class is called
+<code>String</code>, not <code>Strings</code>. If the project ever becomes a
+library or develops into multiple packages, the class will need to be
+<code>public</code>, but it is not necessary yet.</p>
+
+<pre>class Record { .... }
+</pre>
+
+<p><b>Array or list:</b> array. For me, the number of fields in a record should
+not normally change. The only time would be when adding or deleting a column in
+a table, but the assignment hints that these are rare operations, so they can be
+done by creating new record objects. Using an array documents and enforces the
+restriction that the number of fields doesn't change after a record is created.
+(An array is also more compact and faster that a list, but that's not
+important, it is the guarantee that's important.)</p>
+
+<p>Using a list is not wrong, but more effort is needed to make sure the number
+of fields never changes when it shouldn't. What I would do is to provide
+addField and deleteField methods in the record class, and then make sure they
+are only called from the table's addColumn and deleteColumn methods. That's not
+as robust, because nothing actually prevents incorrect calls to the methods. Ask
+yourself: in your program, is there a way to change the number of fields of a
+record, so that it no longer matches its table? It is not something I could
+check easily when marking, nor something that can easily be tested. Remember,
+robustness complements testing.</p>
+
+<p><b>Name of array:</b> <code>fields</code>.  Also good would be
+<code>entries</code>, <code>values</code>, <code>cells</code>,
+<code>items</code>, or even <code>strings</code>. It should probably be plural
+because it is a collection of many strings. The name <code>record</code> is not
+good, because I would expect a variable called <code>record</code> to have type
+<code>Record</code>. The variable <b>must</b> be private for robustness.</p>
+
+<pre>private String[] fields;
+</pre>
+
+<p><b>Construct from:</b> array of strings. Also good would be to construct from
+an integer giving the number of fields, creating an array of blank strings. If
+the <code>...</code> notation is used, the constructor accepts either an array
+or some explicit strings (which is useful for testing).</p>
+
+<pre>Record(String... values) { .... }
+</pre>
+
+<p>I am using three dots <code>...</code> for real Java syntax and four dots
+<code>....</code> for stuff I am leaving out.</p>
+
+<p><b>Robustness of constructor:</b> check array and make a copy. An incoming
+array which is null or has no strings in it probably makes no sense. If the
+constructor puts the incoming array directly into the <code>fields</code>
+variable, the outside world could still have access to the array and could
+damage the data.</p>
+
+<pre>if (values == null || values.length == 0) throw new Error("No values");
+fields = Arrays.copyOf(values, values.length);
+</pre>
+
+<p><b>Nulls:</b> no. It is not wrong to include nulls, but then you have to make
+sure they are always handled properly and never cause a
+<code>NullPointerException</code>, and you should probably make it clear what
+the difference in meaning is between a null and an empty string. It is simpler
+to exclude nulls from the start.</p>
+
+<pre>for (String value : values) if (value == null) throw new Error("Null");
+</pre>
+
+<p>Real database systems differ over whether they include nulls or not.
+Technically, they are supposed to mean 'unknown', and are related to a three
+value yes/no/maybe logic, but database systems never implement a full
+three-value logic consistently, and if they did nobody would understand them
+properly. In any case, it is difficult to distinguish nulls from blanks when
+printing.</p>
+
+<p><b>Errors or exceptions:</b> errors. Errors are for bugs, and exceptions are
+for user mistakes. It is difficult to know which will be which until the user
+interface is decided. So I'll use errors for now, because they are simpler, and
+rethink when I get to the user interface.</p>
+
+<p><b>Column names:</b> no. They should probably be in the table. Later, if
+necessary, they can be passed in to any method in the <code>Record</code> class
+that needs them. Or they can be stored in the record, but in a way that shares
+them with all other records of the same table. Having a separate copy in every
+record would definitely be bad (the data wouldn't be DRY). I may rethink this in
+the types extension.</p>
+
+<p><b>Other methods:</b> <code>width</code>, <code>get</code>, <code>set</code>.
+A record is really just an array of strings at this stage, so it needs the
+equivalent of <code>a.length</code>, <code>x = a[i]</code>, <code>a[i] =
+x</code>. A method which returns the whole array would be bad, because it would
+destroy robustness, unless a defensive but expensive copy was made, because the
+caller could then damage the data. I've called the number of fields
+<code>width</code> because I am thinking of a table as having a width and
+height.</p>
+
+<pre>int width() { return fields.length; }
+String get(int col) { return fields[col]; }
+void set(int col, String value) { .... fields[col] = value; }
+</pre>
+
+<p><b>Robustness of set:</b> check for null. The <code>set</code> method is the
+only way of updating a field of a record. Having decided that there should be no
+nulls, the <code>set</code> method must prevent them.</p>
+
+<pre>if (value == null) throw new Error("Null value");
+</pre>
+
+<p><b>Range checking:</b> no. It would be reasonable to include a range check in
+<code>get</code> and <code>set</code>:</p>
+
+<pre>if (col &lt; 0 || col >= fields.length) throw new Error("Bad col");
+</pre>
+
+<p>This is defensive programming. If an error is made in the rest of the
+program, this test makes sure that you get a good error message and line number.
+If you leave it out, you get a 'random' error message from the system. In the
+end, I decided against, because the system error message is not too bad, and I
+want to keep the code short and simple.</p>
+
+<p><b>Testing:</b> minor. I've just tested creation of a record and updating one
+field. I've added a test to show that if you pass an array in and then change
+it, the record isn't damaged. I don't usually include tests like this, because
+demonstrating robustness in tests is usually nearly impossible, so this is just
+to illustrate the issue. (Try this: take out the copying in the constructor and
+see the test fail.)</p>
+
+<p><b>Summary:</b> Lot's of decisions, tiny amount of code, total
+robustness.</p>
+
+</body>
+</html>

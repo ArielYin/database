@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-GB" xml:lang="en-GB">
+<head>
+<meta name="style" content="cs" />
+<title>User Interface</title>
+<style>
+body { font-size: 120%; }
+pre, .indent { margin-left: 40px; }
+.middle { text-align: center; }
+td { padding: 0 20px; }
+</style>
+</head>
+<body>
+
+<h2>User Interface</h2>
+
+<p>This is the most popular extension. But I deliberately made it an extension
+to try my hardest to encourage people to leave user interface issues until late
+on. Here is a summary of design decisions for a user interface:</p>
+
+<p class="indent"><a href="Dabble.java">Dabble.java</a><br/>
+<a href="Database.java">Database.java</a> (no change)<br/>
+<a href="Table.java">Table.java</a> (no change)<br/>
+<a href="Record.java">Record.java</a> (no change)<br/>
+<a href="Makefile">Makefile</a></p>
+
+<p><b>Name of class:</b> <code>Dabble</code>. I would have called it
+<code>Commands</code>, but I'm thinking of the user interface class as the main
+program class, and it is time to find a name for this mini-project. I've chosen
+<code>Dabble</code>.</p>
+
+<p><b>Style</b> it is really important to start simple, so this will be text,
+not graphics. I personally don't like the style of user interface where the
+program prompts the user for the next item all the time. So instead I am going
+to try to design a collection of SQL-like commands the user can type, but a lot
+simpler.</p>
+
+<p>Every command is going to consist of words with spaces in between. That way,
+I can use <code>line.split(" ")</code> to parse it. About the minimum I think I
+can get away with is:</p>
+
+<table class="indent">
+<tr><td><b><code>help</code></b></td>
+    <td>describe the available commands</td></tr>
+<tr><td><b><code>list</code></b></td>
+    <td>list the current tables</td></tr>
+<tr><td><b><code>create t x y z....</code></b></td>
+    <td>create an empty table
+    <b><code>t</code></b> with the given columns</td></tr>
+<tr><td><b><code>drop t</code></b></td>
+    <td>delete a table</td></tr>
+<tr><td><b><code>select t</code></b></td>
+    <td>list the records in table <b><code>t</code></b> (later, add a facility to pick some)</td></tr>
+<tr><td><b><code>insert t x y z....</code></b></td>
+    <td>add a record to <b><code>t</code></b> with the given fields</td></tr>
+<tr><td><b><code>update t x y z....</code></b></td>
+    <td>replace the record in <b><code>t</code></b>
+        with key <b><code>x</code></b></td></tr>
+<tr><td><b><code>delete t x</code></b></td>
+    <td>delete a record from
+    <b><code>t</code></b> with the given key field</td></tr>
+<tr><td><b><code>quit</code></b></td>
+    <td>save all the tables and exit</td></tr>
+</table>
+
+<p>The main loop is something like:</p>
+
+<pre>Scanner in = ....;
+boolean ended = false;
+System.out.print("> ");
+while (! ended &amp;&amp; in.hasNextLine()) {
+    String line = in.nextLine();
+    ....
+    if (! ended) System.out.print("> ");
+}
+in.close();
+</pre>
+
+<p>A subtle point here is that <code>in.hasNextLine()</code> only returns true
+<em>after</em> checking that there really is a next line, which is
+<em>after</em> the user has typed the line in. Therefore it is important to have
+a prompt before the loop starts, and for <code>!ended</code> to be checked first
+in the loop test. Adding <code>System.out.flush()</code> after printing a prompt
+deals with situations involving buffering of the output.</p>
+
+<p>For each command, I think it is easy enough to do all the testing required to
+make sure it is going to work (right number of columns, unique keys, etc) and
+give the user an appropriate message if not. That means I don't need to change
+my decision about throwing errors in the other classes.</p>
+
+<p>There are many issues left. The user interface doesn't exercise all the
+features of the other classes, such as auto-increment. And what about field
+values with spaces or commas or newlines in? The simplest option for now would
+be to make the user type <code>%s</code>, <code>%c</code>, <code>%n</code>,
+<code>%p</code>.</p>
+
+</body>
+</html>
